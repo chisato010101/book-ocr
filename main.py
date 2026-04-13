@@ -8,6 +8,10 @@ from fastapi.responses import HTMLResponse, JSONResponse
 app = FastAPI(title="Book OCR")
 client = anthropic.Anthropic()
 
+# Resolve the HTML path relative to this file so it works in any working directory
+_HERE = Path(__file__).parent
+_INDEX = _HERE / "static" / "index.html"
+
 SUPPORTED_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB per image
 
@@ -20,7 +24,7 @@ EXTRACT_PROMPT = (
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    return Path("static/index.html").read_text(encoding="utf-8")
+    return _INDEX.read_text(encoding="utf-8")
 
 
 @app.post("/api/extract")
