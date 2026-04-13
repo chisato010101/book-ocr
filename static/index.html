@@ -2,8 +2,10 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>書頁 OCR — 批次文字擷取</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>書頁 OCR</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -12,142 +14,184 @@
       background: #f5f5f7;
       color: #1d1d1f;
       min-height: 100vh;
+      /* safe area for iPhone notch / home indicator */
+      padding-bottom: env(safe-area-inset-bottom);
     }
 
     header {
       background: #fff;
       border-bottom: 1px solid #e5e5ea;
-      padding: 1rem 2rem;
+      padding: 0.9rem 1.25rem;
+      padding-top: calc(0.9rem + env(safe-area-inset-top));
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.6rem;
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
-    header h1 { font-size: 1.25rem; font-weight: 600; }
-    header span { font-size: 1.5rem; }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
 
     main {
-      max-width: 960px;
-      margin: 2rem auto;
-      padding: 0 1.5rem;
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 1.25rem 1rem 3rem;
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
+      gap: 1.25rem;
     }
 
-    /* Drop zone */
+    /* ---- Upload buttons ---- */
+    #upload-area {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    .upload-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 1.4rem 0.75rem;
+      border-radius: 16px;
+      background: #fff;
+      border: 2px solid #e5e5ea;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #0071e3;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .upload-btn:active { background: #f0f6ff; border-color: #0071e3; }
+    .upload-btn .icon { font-size: 2rem; }
+    .upload-btn small { font-size: 0.75rem; color: #8e8e93; font-weight: 400; }
+
+    /* Desktop drop zone */
     #drop-zone {
+      display: none;
       border: 2px dashed #c7c7cc;
       border-radius: 16px;
       background: #fff;
-      padding: 3rem 2rem;
+      padding: 2.5rem 2rem;
       text-align: center;
       cursor: pointer;
       transition: border-color 0.2s, background 0.2s;
     }
-    #drop-zone.drag-over {
-      border-color: #0071e3;
-      background: #f0f6ff;
-    }
-    #drop-zone .icon { font-size: 3rem; margin-bottom: 0.75rem; }
-    #drop-zone p { color: #6e6e73; font-size: 0.95rem; margin-top: 0.4rem; }
+    #drop-zone.drag-over { border-color: #0071e3; background: #f0f6ff; }
+    #drop-zone .icon { font-size: 2.5rem; margin-bottom: 0.6rem; }
+    #drop-zone p { color: #6e6e73; font-size: 0.9rem; margin-top: 0.3rem; }
     #drop-zone strong { color: #0071e3; }
 
-    #file-input { display: none; }
+    @media (hover: hover) and (pointer: fine) {
+      /* Desktop: show drop zone, hide mobile buttons */
+      #upload-area { display: none; }
+      #drop-zone   { display: block; }
+    }
 
+    input[type=file] { display: none; }
+
+    /* ---- Buttons ---- */
     .btn {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 0.4rem;
-      padding: 0.6rem 1.4rem;
+      min-height: 44px;          /* iOS HIG minimum touch target */
+      padding: 0 1.25rem;
       border-radius: 980px;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
       font-weight: 500;
       border: none;
       cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
       transition: opacity 0.15s;
     }
-    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .btn-primary { background: #0071e3; color: #fff; }
-    .btn-primary:not(:disabled):hover { background: #0077ed; }
-    .btn-secondary { background: #e5e5ea; color: #1d1d1f; }
-    .btn-secondary:not(:disabled):hover { background: #d8d8dc; }
-    .btn-danger { background: #ff3b30; color: #fff; }
+    .btn:disabled { opacity: 0.4; pointer-events: none; }
+    .btn-primary  { background: #0071e3; color: #fff; }
+    .btn-primary:active  { background: #005bbf; }
+    .btn-secondary{ background: #e5e5ea; color: #1d1d1f; }
+    .btn-secondary:active { background: #d4d4d8; }
+    .btn-danger   { background: #ff3b30; color: #fff; }
+    .btn-danger:active { background: #d9342a; }
+    .btn-full     { width: 100%; }
 
-    /* Preview grid */
+    /* ---- Preview grid ---- */
     #preview-section { display: none; }
     #preview-section h2 {
-      font-size: 1rem;
+      font-size: 0.9rem;
       font-weight: 600;
-      margin-bottom: 0.75rem;
-      color: #3a3a3c;
+      color: #6e6e73;
+      margin-bottom: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
     }
 
     #preview-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 0.75rem;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 0.6rem;
+    }
+    @media (min-width: 500px) {
+      #preview-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
     }
 
     .preview-card {
       background: #fff;
       border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      box-shadow: 0 1px 3px rgba(0,0,0,.1);
       position: relative;
-      cursor: grab;
-      transition: transform 0.15s, box-shadow 0.15s;
-      user-select: none;
     }
-    .preview-card:active { cursor: grabbing; }
-    .preview-card.dragging {
-      opacity: 0.5;
-      transform: scale(0.97);
-      box-shadow: 0 6px 20px rgba(0,0,0,.15);
+    /* Desktop: draggable */
+    @media (hover: hover) and (pointer: fine) {
+      .preview-card { cursor: grab; }
+      .preview-card:active { cursor: grabbing; }
+      .preview-card.dragging { opacity: 0.45; transform: scale(0.96); }
+      .preview-card.drag-target { outline: 2px solid #0071e3; }
     }
-    .preview-card.drag-target { outline: 2px solid #0071e3; }
 
     .preview-card img {
       width: 100%;
-      height: 110px;
+      aspect-ratio: 3/4;
       object-fit: cover;
       display: block;
     }
-    .preview-card .card-footer {
-      padding: 0.35rem 0.5rem;
+    .card-footer {
+      padding: 0.3rem 0.5rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
-    .preview-card .page-label {
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: #3a3a3c;
-    }
-    .preview-card .remove-btn {
+    .page-label { font-size: 0.72rem; font-weight: 600; color: #3a3a3c; }
+    .remove-btn {
       background: none;
       border: none;
       cursor: pointer;
-      font-size: 1rem;
+      font-size: 1.1rem;
       line-height: 1;
-      color: #8e8e93;
-      padding: 0 2px;
-    }
-    .preview-card .remove-btn:hover { color: #ff3b30; }
-
-    /* Actions row */
-    #actions {
-      display: none;
+      color: #aeaeb2;
+      min-width: 28px;
+      min-height: 28px;
+      display: flex;
       align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
+      justify-content: center;
+      border-radius: 50%;
+      -webkit-tap-highlight-color: transparent;
     }
-    #page-count {
-      margin-left: auto;
-      font-size: 0.85rem;
-      color: #6e6e73;
-    }
+    .remove-btn:active { background: #f2f2f7; color: #ff3b30; }
 
-    /* Progress */
+    /* ---- Actions ---- */
+    #actions { display: none; flex-direction: column; gap: 0.6rem; }
+    @media (min-width: 480px) {
+      #actions { flex-direction: row; flex-wrap: wrap; align-items: center; }
+      #actions .btn-full { width: auto; flex: 1; }
+      #page-count { margin-left: auto; }
+    }
+    #page-count { font-size: 0.85rem; color: #6e6e73; text-align: center; }
+
+    /* ---- Progress ---- */
     #progress-section { display: none; }
     #progress-bar-wrap {
       background: #e5e5ea;
@@ -162,28 +206,23 @@
       width: 0%;
       transition: width 0.3s;
     }
-    #progress-label {
-      font-size: 0.85rem;
-      color: #6e6e73;
-      margin-top: 0.5rem;
-    }
+    #progress-label { font-size: 0.85rem; color: #6e6e73; margin-top: 0.5rem; }
 
-    /* Results */
+    /* ---- Results ---- */
     #results-section { display: none; }
-    #results-header {
+    #results-top {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      flex-direction: column;
+      gap: 0.6rem;
       margin-bottom: 0.75rem;
-      flex-wrap: wrap;
-      gap: 0.5rem;
     }
-    #results-header h2 { font-size: 1rem; font-weight: 600; color: #3a3a3c; }
+    #results-title { font-size: 1rem; font-weight: 600; }
+    #results-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
     .result-card {
       background: #fff;
       border-radius: 12px;
-      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
       margin-bottom: 1rem;
       overflow: hidden;
     }
@@ -191,57 +230,51 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.75rem 1rem;
+      padding: 0.65rem 0.9rem;
       border-bottom: 1px solid #f2f2f7;
       background: #fafafa;
+      gap: 0.5rem;
     }
     .result-card-header .title {
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       font-weight: 600;
       color: #3a3a3c;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
     }
-    .result-card-header .copy-btn {
-      font-size: 0.8rem;
-      padding: 0.3rem 0.75rem;
-    }
-    .result-card-body { padding: 1rem; }
+    .copy-btn { font-size: 0.8rem; padding: 0 0.9rem; min-height: 34px; flex-shrink: 0; }
+    .result-card-body { padding: 0.9rem; }
     .result-card-body pre {
       font-family: inherit;
       white-space: pre-wrap;
       word-break: break-word;
-      font-size: 0.9rem;
-      line-height: 1.7;
+      font-size: 0.92rem;
+      line-height: 1.75;
       color: #1d1d1f;
     }
-    .result-card.error .result-card-body pre {
-      color: #ff3b30;
-    }
-    .token-info {
-      font-size: 0.75rem;
-      color: #aeaeb2;
-      margin-top: 0.5rem;
-    }
+    .result-card.error .result-card-body pre { color: #ff3b30; }
+    .token-info { font-size: 0.72rem; color: #c7c7cc; margin-top: 0.5rem; }
 
-    /* Toast */
+    /* ---- Toast ---- */
     #toast {
       position: fixed;
-      bottom: 2rem;
+      bottom: calc(1.5rem + env(safe-area-inset-bottom));
       left: 50%;
       transform: translateX(-50%) translateY(60px);
-      background: #1d1d1f;
+      background: rgba(30,30,30,.92);
       color: #fff;
-      padding: 0.6rem 1.2rem;
+      padding: 0.55rem 1.1rem;
       border-radius: 980px;
       font-size: 0.875rem;
       opacity: 0;
-      transition: opacity 0.25s, transform 0.25s;
+      transition: opacity 0.22s, transform 0.22s;
       pointer-events: none;
       white-space: nowrap;
+      backdrop-filter: blur(8px);
     }
-    #toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   </style>
 </head>
 <body>
@@ -253,27 +286,47 @@
 
 <main>
 
-  <!-- Drop zone -->
+  <!-- Mobile upload buttons -->
+  <div id="upload-area">
+    <label class="upload-btn" for="camera-input">
+      <span class="icon">📷</span>
+      拍照
+      <small>直接開相機</small>
+    </label>
+    <label class="upload-btn" for="file-input">
+      <span class="icon">🖼️</span>
+      選取照片
+      <small>從相片庫選取</small>
+    </label>
+  </div>
+
+  <!-- Desktop drop zone -->
   <div id="drop-zone">
     <div class="icon">🖼️</div>
     <p><strong>點擊選取</strong>或直接拖曳書頁照片到此處</p>
-    <p>支援 JPEG、PNG、WebP・每張上限 20MB・最多 50 張</p>
-    <input type="file" id="file-input" accept="image/jpeg,image/png,image/gif,image/webp" multiple />
+    <p>支援 JPEG、PNG、WebP · 每張上限 20MB · 最多 50 張</p>
   </div>
+
+  <!-- Hidden file inputs -->
+  <!-- image/* lets iOS auto-convert HEIC → JPEG -->
+  <input type="file" id="camera-input" accept="image/*" capture="environment" />
+  <input type="file" id="file-input"   accept="image/*" multiple />
 
   <!-- Preview -->
   <section id="preview-section">
-    <h2>已選圖片（可拖曳調整頁序）</h2>
+    <h2>已選圖片</h2>
     <div id="preview-grid"></div>
   </section>
 
   <!-- Action buttons -->
   <div id="actions">
-    <button class="btn btn-primary" id="extract-btn" onclick="startExtract()">
+    <button class="btn btn-primary btn-full" id="extract-btn" onclick="startExtract()">
       ✨ 開始擷取文字
     </button>
-    <button class="btn btn-secondary" onclick="addMore()">＋ 新增圖片</button>
-    <button class="btn btn-danger" onclick="clearAll()">✕ 清除全部</button>
+    <button class="btn btn-secondary btn-full" id="add-more-btn" onclick="addMorePhotos()">
+      ＋ 新增圖片
+    </button>
+    <button class="btn btn-danger btn-full" onclick="clearAll()">✕ 清除全部</button>
     <span id="page-count"></span>
   </div>
 
@@ -285,10 +338,10 @@
 
   <!-- Results -->
   <section id="results-section">
-    <div id="results-header">
-      <h2 id="results-title">擷取結果</h2>
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
-        <button class="btn btn-secondary" onclick="copyAll()">📋 複製全部文字</button>
+    <div id="results-top">
+      <div id="results-title">擷取結果</div>
+      <div id="results-actions">
+        <button class="btn btn-secondary" onclick="copyAll()">📋 複製全部</button>
         <button class="btn btn-secondary" onclick="downloadTxt()">⬇ 下載 .txt</button>
         <button class="btn btn-secondary" onclick="clearResults()">↩ 重新上傳</button>
       </div>
@@ -301,28 +354,32 @@
 <div id="toast"></div>
 
 <script>
-  let files = [];   // ordered list of File objects
+  let files = [];
   let dragSrcIdx = null;
+  const isTouch = !window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-  const dropZone   = document.getElementById('drop-zone');
-  const fileInput  = document.getElementById('file-input');
-  const previewSec = document.getElementById('preview-section');
-  const previewGrid = document.getElementById('preview-grid');
-  const actions    = document.getElementById('actions');
-  const pageCount  = document.getElementById('page-count');
-  const extractBtn = document.getElementById('extract-btn');
-  const progressSec = document.getElementById('progress-section');
-  const progressBar = document.getElementById('progress-bar');
-  const progressLbl = document.getElementById('progress-label');
-  const resultsSec  = document.getElementById('results-section');
-  const resultsList = document.getElementById('results-list');
+  const cameraInput  = document.getElementById('camera-input');
+  const fileInput    = document.getElementById('file-input');
+  const dropZone     = document.getElementById('drop-zone');
+  const previewSec   = document.getElementById('preview-section');
+  const previewGrid  = document.getElementById('preview-grid');
+  const actions      = document.getElementById('actions');
+  const pageCount    = document.getElementById('page-count');
+  const extractBtn   = document.getElementById('extract-btn');
+  const progressSec  = document.getElementById('progress-section');
+  const progressBar  = document.getElementById('progress-bar');
+  const progressLbl  = document.getElementById('progress-label');
+  const resultsSec   = document.getElementById('results-section');
+  const resultsList  = document.getElementById('results-list');
   const resultsTitle = document.getElementById('results-title');
 
-  // ---------- Drop zone ----------
-  dropZone.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', e => addFiles(Array.from(e.target.files)));
+  // ---- File inputs ----
+  cameraInput.addEventListener('change', e => addFiles(Array.from(e.target.files)));
+  fileInput.addEventListener('change',   e => addFiles(Array.from(e.target.files)));
 
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  // ---- Desktop drop zone ----
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
   dropZone.addEventListener('drop', e => {
     e.preventDefault();
@@ -330,63 +387,71 @@
     addFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')));
   });
 
-  function addMore() { fileInput.click(); }
+  // "新增圖片" in actions row — on mobile open photo library, on desktop open file picker
+  function addMorePhotos() { fileInput.click(); }
 
   function addFiles(newFiles) {
-    const allowed = ['image/jpeg','image/png','image/gif','image/webp','image/jpg'];
-    const valid = newFiles.filter(f => allowed.includes(f.type));
-    if (valid.length < newFiles.length) showToast('已略過不支援的格式');
+    // image/* on iOS already gives JPEG; filter anything non-image just in case
+    const valid = newFiles.filter(f => f.type.startsWith('image/'));
+    const skipped = newFiles.length - valid.length;
+    if (skipped > 0) showToast(`已略過 ${skipped} 個不支援的格式`);
     files = [...files, ...valid].slice(0, 50);
     renderPreviews();
+    // Reset inputs so the same file can be re-selected
+    cameraInput.value = '';
+    fileInput.value   = '';
   }
 
   function renderPreviews() {
     previewGrid.innerHTML = '';
+
     files.forEach((file, idx) => {
-      const url = URL.createObjectURL(file);
+      const url  = URL.createObjectURL(file);
       const card = document.createElement('div');
-      card.className = 'preview-card';
-      card.draggable = true;
+      card.className   = 'preview-card';
       card.dataset.idx = idx;
+      if (!isTouch) card.draggable = true;
 
       card.innerHTML = `
-        <img src="${url}" alt="page ${idx+1}" loading="lazy" />
+        <img src="${url}" alt="第${idx+1}頁" loading="lazy" />
         <div class="card-footer">
           <span class="page-label">第 ${idx+1} 頁</span>
-          <button class="remove-btn" title="移除" data-idx="${idx}">✕</button>
+          <button class="remove-btn" data-idx="${idx}" title="移除">✕</button>
         </div>`;
 
-      card.addEventListener('dragstart', e => {
-        dragSrcIdx = idx;
-        setTimeout(() => card.classList.add('dragging'), 0);
-      });
-      card.addEventListener('dragend', () => card.classList.remove('dragging'));
-      card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-target'); });
-      card.addEventListener('dragleave', () => card.classList.remove('drag-target'));
-      card.addEventListener('drop', e => {
-        e.preventDefault();
-        card.classList.remove('drag-target');
-        if (dragSrcIdx !== null && dragSrcIdx !== idx) {
-          const moved = files.splice(dragSrcIdx, 1)[0];
-          files.splice(idx, 0, moved);
-          renderPreviews();
-        }
-      });
+      // Desktop drag-to-reorder
+      if (!isTouch) {
+        card.addEventListener('dragstart', () => {
+          dragSrcIdx = idx;
+          setTimeout(() => card.classList.add('dragging'), 0);
+        });
+        card.addEventListener('dragend',  () => card.classList.remove('dragging'));
+        card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-target'); });
+        card.addEventListener('dragleave',() => card.classList.remove('drag-target'));
+        card.addEventListener('drop', e => {
+          e.preventDefault();
+          card.classList.remove('drag-target');
+          if (dragSrcIdx !== null && dragSrcIdx !== idx) {
+            const moved = files.splice(dragSrcIdx, 1)[0];
+            files.splice(idx, 0, moved);
+            renderPreviews();
+          }
+        });
+      }
 
       card.querySelector('.remove-btn').addEventListener('click', e => {
         e.stopPropagation();
-        files.splice(+e.target.dataset.idx, 1);
+        files.splice(+e.currentTarget.dataset.idx, 1);
         renderPreviews();
       });
 
       previewGrid.appendChild(card);
     });
 
-    const hasFiles = files.length > 0;
-    previewSec.style.display = hasFiles ? '' : 'none';
-    actions.style.display    = hasFiles ? 'flex' : 'none';
+    const has = files.length > 0;
+    previewSec.style.display = has ? '' : 'none';
+    actions.style.display    = has ? 'flex' : 'none';
     pageCount.textContent    = `共 ${files.length} 張`;
-    fileInput.value = '';
   }
 
   function clearAll() {
@@ -395,28 +460,27 @@
     resultsSec.style.display = 'none';
   }
 
-  // ---------- Extract ----------
+  // ---- Extract ----
   async function startExtract() {
-    if (files.length === 0) return;
+    if (!files.length) return;
 
     extractBtn.disabled = true;
     progressSec.style.display = '';
-    resultsSec.style.display = 'none';
-    resultsList.innerHTML = '';
+    resultsSec.style.display  = 'none';
+    resultsList.innerHTML     = '';
 
-    const total = files.length;
+    const total   = files.length;
     const results = [];
-
-    // Send in batches of 5 to avoid overwhelming the server
-    const BATCH = 5;
-    let done = 0;
+    const BATCH   = 5;
+    let done      = 0;
 
     for (let start = 0; start < total; start += BATCH) {
       const batch = files.slice(start, start + BATCH);
-      const form = new FormData();
+      const form  = new FormData();
       batch.forEach(f => form.append('files', f));
 
-      updateProgress(done, total, `正在處理第 ${done+1}–${Math.min(done+batch.length, total)} 頁…`);
+      updateProgress(done, total,
+        `正在處理第 ${done + 1}–${Math.min(done + batch.length, total)} 頁…`);
 
       try {
         const resp = await fetch('/api/extract', { method: 'POST', body: form });
@@ -425,7 +489,6 @@
           throw new Error(err.detail || resp.statusText);
         }
         const data = await resp.json();
-        // Re-number pages according to original order
         data.results.forEach((r, i) => {
           r.page = start + i + 1;
           results.push(r);
@@ -440,7 +503,8 @@
       }
 
       done += batch.length;
-      updateProgress(done, total, done < total ? `已完成 ${done} / ${total} 頁` : '完成！');
+      updateProgress(done, total,
+        done < total ? `已完成 ${done} / ${total} 頁` : '完成！');
     }
 
     showResults(results);
@@ -452,10 +516,10 @@
     progressLbl.textContent = label;
   }
 
-  // ---------- Results ----------
+  // ---- Results ----
   function showResults(results) {
     progressSec.style.display = 'none';
-    resultsSec.style.display = '';
+    resultsSec.style.display  = '';
 
     const ok = results.filter(r => r.success).length;
     resultsTitle.textContent = `擷取結果（${ok} / ${results.length} 頁成功）`;
@@ -465,43 +529,54 @@
       const card = document.createElement('div');
       card.className = 'result-card' + (r.success ? '' : ' error');
 
-      const header = `
-        <div class="result-card-header">
-          <span class="title">第 ${r.page} 頁　<span style="font-weight:400;color:#8e8e93">${escHtml(r.filename)}</span></span>
-          ${r.success ? `<button class="btn btn-secondary copy-btn" onclick="copyCard(this)">複製</button>` : ''}
-        </div>`;
+      const header =
+        `<div class="result-card-header">
+           <span class="title">第 ${r.page} 頁 · ${escHtml(r.filename)}</span>
+           ${r.success
+             ? `<button class="btn btn-secondary copy-btn" onclick="copyCard(this)">複製</button>`
+             : ''}
+         </div>`;
 
       const body = r.success
         ? `<div class="result-card-body">
-             <pre id="page-text-${r.page}">${escHtml(r.text)}</pre>
-             ${r.usage ? `<div class="token-info">輸入 ${r.usage.input_tokens} / 輸出 ${r.usage.output_tokens} tokens</div>` : ''}
+             <pre>${escHtml(r.text)}</pre>
+             ${r.usage
+               ? `<div class="token-info">輸入 ${r.usage.input_tokens} / 輸出 ${r.usage.output_tokens} tokens</div>`
+               : ''}
            </div>`
         : `<div class="result-card-body"><pre>${escHtml(r.error)}</pre></div>`;
 
       card.innerHTML = header + body;
       resultsList.appendChild(card);
     });
+
+    // Scroll to results
+    resultsSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function copyCard(btn) {
     const pre = btn.closest('.result-card').querySelector('pre');
-    navigator.clipboard.writeText(pre.textContent).then(() => showToast('已複製！'));
+    navigator.clipboard.writeText(pre.textContent)
+      .then(() => showToast('已複製！'))
+      .catch(() => showToast('複製失敗，請手動選取'));
   }
 
   function copyAll() {
-    const allText = getAllText();
-    if (!allText) return showToast('沒有可複製的文字');
-    navigator.clipboard.writeText(allText).then(() => showToast('已複製全部文字！'));
+    const text = getAllText();
+    if (!text) return showToast('沒有可複製的文字');
+    navigator.clipboard.writeText(text)
+      .then(() => showToast('已複製全部文字！'))
+      .catch(() => showToast('複製失敗，請手動選取'));
   }
 
   function downloadTxt() {
-    const allText = getAllText();
-    if (!allText) return showToast('沒有可下載的文字');
-    const blob = new Blob([allText], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'book-ocr-' + new Date().toISOString().slice(0,10) + '.txt';
+    const text = getAllText();
+    if (!text) return showToast('沒有可下載的文字');
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'book-ocr-' + new Date().toISOString().slice(0, 10) + '.txt';
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -516,22 +591,22 @@
     clearAll();
   }
 
-  // ---------- Toast ----------
+  // ---- Toast ----
   let toastTimer;
   function showToast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
   }
 
   function escHtml(str) {
     return String(str ?? '')
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;');
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 </script>
 </body>
