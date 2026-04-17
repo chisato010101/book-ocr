@@ -345,5 +345,10 @@
   }
 
   // ---------- 啟動 ----------
-  document.addEventListener('DOMContentLoaded', init);
+  // script 標籤位於 body 結尾，DOM 已就緒時直接 init；否則等 DOMContentLoaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
