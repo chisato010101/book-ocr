@@ -1,14 +1,7 @@
 // api.js — 對外 API 呼叫封裝
 
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
-const TYCG_PARKING_URL =
-  'https://data.tycg.gov.tw/api/v1/rest/datastore/0daad6e6-0632-44f5-bd25-5e1de1e9146f?format=json';
-
-// CORS proxies（依序嘗試）
-const CORS_PROXIES = [
-  'https://corsproxy.io/?',
-  'https://api.allorigins.win/raw?url=',
-];
+const TYCG_PARKING_URL = 'https://parking-proxy.gyunim3333.workers.dev/';
 
 /**
  * 地名 → 經緯度（Nominatim）
@@ -59,7 +52,9 @@ async function geocode(query) {
 async function fetchParkingLots() {
   let raw;
   try {
-    raw = await fetchJsonWithFallback(TYCG_PARKING_URL);
+    const res = await fetch(TYCG_PARKING_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    raw = await res.json();
   } catch (e) {
     console.error('fetchParkingLots error:', e);
     throw new Error('停車場資料載入失敗，請稍後再試');
@@ -113,26 +108,3 @@ function normalizeParkingRecord(r) {
   };
 }
 
-/**
- * 嘗試直連，失敗則改走 CORS proxy
- */
-async function fetchJsonWithFallback(url) {
-  try {
-    const res = await fetch(url, { headers: { Accept: 'application/json' } });
-    if (res.ok) return await res.json();
-  } catch (e) {
-    console.warn('Direct fetch failed:', e.message);
-  }
-
-  for (const proxy of CORS_PROXIES) {
-    try {
-      const res = await fetch(proxy + encodeURIComponent(url), { headers: { Accept: 'application/json' } });
-      if (res.ok) return await res.json();
-      console.warn(`Proxy ${proxy} returned ${res.status}`);
-    } catch (e) {
-      console.warn(`Proxy ${proxy} failed:`, e.message);
-    }
-  }
-
-  throw new Error('All fetch attempts failed');
-}
