@@ -4,8 +4,11 @@ const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 const TYCG_PARKING_URL =
   'https://data.tycg.gov.tw/api/v1/rest/datastore/0daad6e6-0632-44f5-bd25-5e1de1e9146f?format=json';
 
-// CORS proxy（備援，僅在直連失敗時使用）
-const CORS_PROXY = 'https://corsproxy.io/?';
+// CORS proxies（依序嘗試）
+const CORS_PROXIES = [
+  'https://corsproxy.io/?',
+  'https://api.allorigins.win/raw?url=',
+];
 
 /**
  * 地名 → 經緯度（Nominatim）
@@ -117,12 +120,19 @@ async function fetchJsonWithFallback(url) {
   try {
     const res = await fetch(url, { headers: { Accept: 'application/json' } });
     if (res.ok) return await res.json();
-    throw new Error('direct fetch not ok: ' + res.status);
   } catch (e) {
-    console.warn('Direct fetch failed, trying CORS proxy:', e.message);
-    const proxyUrl = CORS_PROXY + encodeURIComponent(url);
-    const res2 = await fetch(proxyUrl, { headers: { Accept: 'application/json' } });
-    if (!res2.ok) throw new Error('proxy fetch failed: ' + res2.status);
-    return await res2.json();
+    console.warn('Direct fetch failed:', e.message);
   }
+
+  for (const proxy of CORS_PROXIES) {
+    try {
+      const res = await fetch(proxy + encodeURIComponent(url), { headers: { Accept: 'application/json' } });
+      if (res.ok) return await res.json();
+      console.warn(`Proxy ${proxy} returned ${res.status}`);
+    } catch (e) {
+      console.warn(`Proxy ${proxy} failed:`, e.message);
+    }
+  }
+
+  throw new Error('All fetch attempts failed');
 }
