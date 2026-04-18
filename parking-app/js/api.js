@@ -60,17 +60,9 @@ async function fetchParkingLots() {
     throw new Error('停車場資料載入失敗，請稍後再試');
   }
 
-  // API 結構通常是 { result: { records: [...] } }，不過為保險起見多寫幾種
-  let records = [];
-  if (raw && raw.result && Array.isArray(raw.result.records)) {
-    records = raw.result.records;
-  } else if (Array.isArray(raw)) {
-    records = raw;
-  } else if (raw && Array.isArray(raw.records)) {
-    records = raw.records;
-  }
+  const records = (raw && Array.isArray(raw.CarParks)) ? raw.CarParks : [];
 
-  if (!Array.isArray(records) || records.length === 0) {
+  if (records.length === 0) {
     throw new Error('停車場資料載入失敗，請稍後再試');
   }
 
@@ -78,33 +70,55 @@ async function fetchParkingLots() {
 }
 
 /**
- * 統一欄位、轉型、過濾無效資料。
- * 回傳 null 代表此筆資料不應納入。
+ * 統一欄位、轉型、過濾無效資料（TDX 格式）
  */
 function normalizeParkingRecord(r) {
   if (!r) return null;
 
-  // Display === "N" 過濾
-  const display = (r.Display || r.display || '').toString().toUpperCase();
-  if (display === 'N') return null;
-
-  const lat = toNumber(r.wgsY);
-  const lng = toNumber(r.wgsX);
+  const pos = r.CarParkPosition || {};
+  const lat = toNumber(pos.PositionLat);
+  const lng = toNumber(pos.PositionLon);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
+  const avail = r.Availability || {};
+  const spaces = Array.isArray(avail.Spaces) ? avail.Spaces : null;
+
+  // 車位：可能在 AvailableSpaces 或 Spaces[].AvailableSpaces
+  let surplusSpace = -1;
+  let totalSpace = 0;
+  if (Number.isFinite(toNumber(avail.AvailableSpaces))) {
+    surplusSpace = toNumber(avail.AvailableSpaces);
+  } else if (spaces && spaces.length > 0) {
+    const first = spaces[0];
+    if (Number.isFinite(toNumber(first.AvailableSpaces))) {
+      surplusSpace = toNumber(first.AvailableSpaces);
+    }
+  }
+
+  if (Number.isFinite(toNumber(avail.TotalSpaces))) {
+    totalSpace = toNumber(avail.TotalSpaces);
+  } else if (spaces && spaces.length > 0) {
+    const first = spaces[0];
+    if (Number.isFinite(toNumber(first.TotalSpaces))) {
+      totalSpace = toNumber(first.TotalSpaces);
+    }
+  }
+
+  const name = (r.CarParkName && (r.CarParkName.Zh_tw || r.CarParkName.En)) || '未命名停車場';
+
   return {
-    id: r.parkId || r.parkID || r.id || '',
-    name: r.parkName || '未命名停車場',
-    address: r.address || '',
-    areaName: r.areaName || '',
-    areaId: r.areaId || '',
+    id: r.CarParkID || '',
+    name,
+    address: r.Address || '',
+    areaName: '',
+    areaId: '',
     lat,
     lng,
-    totalSpace: toNumber(r.totalSpace) || 0,
-    surplusSpace: Number.isFinite(toNumber(r.surplusSpace)) ? toNumber(r.surplusSpace) : -1,
-    chargingSpaces: toNumber(r.chargingSpaces) || 0,
-    payGuide: r.payGuide || '',
-    introduction: r.introduction || '',
+    totalSpace,
+    surplusSpace,
+    chargingSpaces: 0,
+    payGuide: r.FareDescription || '',
+    introduction: r.Description || '',
   };
 }
 
