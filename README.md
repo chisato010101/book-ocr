@@ -1,14 +1,20 @@
 # 🅿️ 桃園停車場查詢
 
-一個純前端網頁應用，輸入目的地即可快速找到附近的停車場、即時剩餘車位、收費資訊，並一鍵跳轉 Google Maps 導航。
+> ⚠️ **此專案目前暫緩開發。**
+>
+> 原因：資料來源覆蓋率不足。桃園市政府開放資料 API 的 SSL 憑證失效導致無法從瀏覽器/Cloudflare Workers 存取；改用交通部 TDX 平台後發現資料不完整（例如南苑停車場等非市府管轄的停車場均未收錄）。要達到 Google Maps 等級的覆蓋率，只能付費使用 Google Places API，或自行長期維護資料，目前評估投入效益不成比例，故暫停。
+>
+> 現有程式碼與部署架構已完成並可運作，僅停車場資料本身不夠齊全。待有更好的資料來源時會再恢復開發。
 
-完全免費、無需註冊、不依賴任何需綁信用卡的 API。
+---
 
-## 線上試用
+## 線上 Demo
 
 部署於 GitHub Pages：**https://chisato010101.github.io/parking-app/**
 
-## 主要功能
+---
+
+## 已實作功能
 
 - 🔍 地名搜尋（透過 OpenStreetMap Nominatim）
 - 📍 「使用我目前的位置」一鍵搜尋附近停車場
@@ -20,13 +26,48 @@
 - 🎛️ 過濾「只顯示有車位的」、依距離或剩餘車位排序
 - 📱 手機優先設計，支援桌機 RWD
 
-## 使用的技術
+---
 
+## 使用的服務 / 技術
+
+### 前端
 - **HTML5 + CSS3 + Vanilla JavaScript**（無框架、免編譯）
 - **Leaflet.js** — 開源地圖元件
 - **OpenStreetMap** — 圖磚資料
-- **Nominatim API** — 地名 → 經緯度
-- **桃園市政府開放資料平台 API** — 路外停車場即時資訊
+
+### 外部 API
+- **Nominatim API**（OpenStreetMap 提供）— 地名 → 經緯度
+- **交通部 TDX 運輸資料流通服務平臺** — 停車場靜態資料與即時剩餘車位
+  - `https://tdx.transportdata.tw/api/basic/v1/Parking/OffStreet/CarPark/City/Taoyuan`
+  - `https://tdx.transportdata.tw/api/basic/v1/Parking/OffStreet/ParkingAvailability/City/Taoyuan`
+- **Google Maps URL Scheme** — 跳轉導航／地點查看（免費、不需要 API Key）
+
+### 雲端架構
+| 服務 | 用途 |
+|---|---|
+| **GitHub** | 原始碼託管 |
+| **GitHub Pages** | 前端靜態網頁託管 |
+| **GitHub Actions** | 推送到主 branch 後自動部署到 GitHub Pages |
+| **Cloudflare Workers** | CORS proxy，幫前端打 TDX API 並加上 CORS headers |
+
+部署流程：
+```
+本地開發 → git push → GitHub Actions → GitHub Pages
+                         ↓
+                瀏覽器載入網頁 → Cloudflare Worker → TDX API
+```
+
+---
+
+## 開發過程中踩過的坑
+
+1. **桃園市政府開放資料 API SSL 憑證失效**（`ERR_CERT_COMMON_NAME_INVALID`）
+   - 瀏覽器、Cloudflare Workers 等凡是會驗證 SSL 的環境都無法呼叫
+   - 只有 server 端（如 Python `requests` 加 `verify=False`）能繞過
+2. **Cloudflare Workers 526 錯誤** — 上游 SSL 驗證失敗，Workers 無法關閉驗證
+3. **TDX API 資料覆蓋率** — 僅含各地方政府登記的停車場，缺私人、水利署等其他類別
+
+---
 
 ## 本地執行
 
@@ -35,6 +76,8 @@ cd parking-app
 python3 -m http.server 8000
 # 開啟 http://localhost:8000
 ```
+
+---
 
 ## 授權
 
